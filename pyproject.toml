@@ -1,0 +1,23 @@
+[project]
+name = "aria"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "chromadb",
+    "docx2txt",
+    "langchain-community",
+    "langchain-text-splitters",
+    "python-dotenv",
+    "pypdf",
+    "langchain-groq",
+    "langgraph",
+    "sentence-transformers",
+]
+
+[project.optional-dependencies]
+llm-providers = [
+    "langchain-anthropic",
+    "langchain-google-genai",
+    "langchain-ollama",
+    "langchain-openai",
+]

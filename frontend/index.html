@@ -1,0 +1,58 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARIA - Voice AI Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="history-title">History</span>
+                <button class="new-chat-btn" id="newChatBtn">+ New Chat</button>
+            </div>
+            <div class="history-list" id="historyList"></div>
+            <button class="theme-toggle" id="themeToggle">Light Mode</button>
+        </aside>
+
+        <!-- Main Area -->
+        <main class="main-area">
+            <div class="top-bar">
+                <div class="brand">
+                    <span class="menu-icon" id="menuIcon">☰</span>
+                    <div class="logo">UV</div>
+                    <div class="brand-text">
+                        <h1>ARIA</h1>
+                        <p>Voice-enabled agentic AI assistant</p>
+                    </div>
+                </div>
+                <div class="top-actions">
+                    <select class="lang-select" id="langSelect">
+                        <option value="en">English</option>
+                        <option value="kn">Kannada</option>
+                        <option value="hi">Hindi</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                    </select>
+                    <button class="export-btn" id="exportBtn">Export Chat</button>
+                </div>
+            </div>
+
+            <div class="chat-area" id="chatArea"></div>
+
+            <div class="input-bar">
+                <button class="icon-btn" id="attachBtn" title="Attach file">📎</button>
+                <input type="file" id="fileInput" hidden>
+                <input type="text" class="chat-input" id="chatInput" placeholder="Type or tap mic to speak...">
+                <button class="icon-btn" id="micBtn" title="Voice input">🎤</button>
+                <button class="send-btn" id="sendBtn">Send</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
