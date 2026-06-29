@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sentence_transformers import SentenceTransformer
 from backend.config import settings
 
 COLLECTION_NAME = "documents"
@@ -46,18 +47,16 @@ def ingest_document(file_path: str) -> int:
         if not chunks:
             return 0
 
-        from sentence_transformers import SentenceTransformer
         import chromadb
 
         os.makedirs(settings.CHROMA_PATH, exist_ok=True)
 
-        model = SentenceTransformer(EMBEDDING_MODEL)
         texts = [chunk.page_content for chunk in chunks]
-        embeddings = model.encode(
+        embed_model = SentenceTransformer(EMBEDDING_MODEL)
+        embeddings = embed_model.encode(
             texts,
             normalize_embeddings=True,
         ).tolist()
-
         file_key = hashlib.sha1(str(path.resolve()).encode("utf-8")).hexdigest()
         ids = [f"{file_key}:{idx}" for idx in range(len(chunks))]
         metadatas = [
