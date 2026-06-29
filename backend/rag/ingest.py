@@ -3,11 +3,11 @@ import hashlib
 from pathlib import Path
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
+from chromadb.utils import embedding_functions
+
 from backend.config import settings
 
 COLLECTION_NAME = "documents"
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 
 def ingest_document(file_path: str) -> int:
@@ -17,17 +17,14 @@ def ingest_document(file_path: str) -> int:
     try:
         if ext == "pdf":
             from langchain_community.document_loaders import PyPDFLoader
-
             loader = PyPDFLoader(file_path)
 
         elif ext == "docx":
             from langchain_community.document_loaders import Docx2txtLoader
-
             loader = Docx2txtLoader(file_path)
 
         elif ext == "txt":
             from langchain_community.document_loaders import TextLoader
-
             loader = TextLoader(file_path, encoding="utf-8")
 
         else:
@@ -49,14 +46,15 @@ def ingest_document(file_path: str) -> int:
 
         import chromadb
 
-        os.makedirs(settings.CHROMA_PATH, exist_ok=True)
+        chroma_path = os.environ.get("CHROMA_PATH", "/tmp/chroma_db")
+        os.makedirs(chroma_path, exist_ok=True)
 
         texts = [chunk.page_content for chunk in chunks]
-        embed_model = SentenceTransformer(EMBEDDING_MODEL)
-        embeddings = embed_model.encode(
-            texts,
-            normalize_embeddings=True,
-        ).tolist()
+
+        # Use ChromaDB built-in embeddings — no sentence_transformers needed
+        embed_fn = embedding_functions.DefaultEmbeddingFunction()
+        embeddings = embed_fn(texts)
+
         file_key = hashlib.sha1(str(path.resolve()).encode("utf-8")).hexdigest()
         ids = [f"{file_key}:{idx}" for idx in range(len(chunks))]
         metadatas = [
@@ -68,8 +66,11 @@ def ingest_document(file_path: str) -> int:
             for idx, chunk in enumerate(chunks)
         ]
 
-        client = chromadb.PersistentClient(path=settings.CHROMA_PATH)
-        collection = client.get_or_create_collection(name=COLLECTION_NAME)
+        client = chromadb.PersistentClient(path=chroma_path)
+        collection = client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            embedding_function=embed_fn
+        )
         collection.upsert(
             ids=ids,
             documents=texts,

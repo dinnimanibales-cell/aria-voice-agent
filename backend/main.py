@@ -1,16 +1,23 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse
 from pydantic import BaseModel
 import shutil, os, json
 from backend.agent.graph import build_graph
+from backend.config import settings
 from backend.rag.ingest import ingest_document
 from backend.db.database import init_db
 from langchain_core.messages import HumanMessage
 
 app = FastAPI(title="Voice RAG Agent")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# ── Root redirect → no need to type /static/index.html ever again
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/static/index.html")
+
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 init_db()
@@ -41,9 +48,7 @@ async def chat_stream(message: str):
 @app.post("/upload")
 async def upload_doc(file: UploadFile = File(...)):
     try:
-        upload_dir = "uploads"
-        if os.path.exists(upload_dir) and not os.path.isdir(upload_dir):
-            os.remove(upload_dir)
+        upload_dir = settings.UPLOAD_DIR
         os.makedirs(upload_dir, exist_ok=True)
         path = os.path.join(upload_dir, file.filename)
         with open(path, "wb") as f:

@@ -15,7 +15,7 @@ class Settings:
     SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
 
     CHROMA_PATH = "./chroma_db"
-    UPLOAD_DIR = "./uploads"
+    UPLOAD_DIR = "./tmp/uploads"
     DB_PATH = "./backend/db/aria.db"
 
 settings = Settings()

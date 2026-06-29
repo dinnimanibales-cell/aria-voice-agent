@@ -1,44 +1,32 @@
-from backend.config import settings
-from backend.rag.ingest import COLLECTION_NAME, EMBEDDING_MODEL
+import os
+import chromadb
+from chromadb.utils import embedding_functions
+
+COLLECTION_NAME = "documents"
 
 _client = None
 _collection = None
-_model = None
+_embed_fn = None
+
+
+def _get_embed_fn():
+    global _embed_fn
+    if _embed_fn is None:
+        _embed_fn = embedding_functions.DefaultEmbeddingFunction()
+    return _embed_fn
 
 
 def _get_collection():
     global _client, _collection
-
     if _collection is None:
-        try:
-            import chromadb
-        except ModuleNotFoundError as exc:
-            raise ImportError(
-                "Document retrieval requires the 'chromadb' package. "
-                "Install it with: pip install chromadb"
-            ) from exc
-
-        _client = chromadb.PersistentClient(path=settings.CHROMA_PATH)
-        _collection = _client.get_or_create_collection(name=COLLECTION_NAME)
-
+        chroma_path = os.environ.get("CHROMA_PATH", "/tmp/chroma_db")
+        os.makedirs(chroma_path, exist_ok=True)
+        _client = chromadb.PersistentClient(path=chroma_path)
+        _collection = _client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            embedding_function=_get_embed_fn()
+        )
     return _collection
-
-
-def _get_model():
-    global _model
-
-    if _model is None:
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ModuleNotFoundError as exc:
-            raise ImportError(
-                "Document retrieval requires the 'sentence-transformers' package. "
-                "Install it with: pip install sentence-transformers"
-            ) from exc
-
-        _model = SentenceTransformer(EMBEDDING_MODEL)
-
-    return _model
 
 
 def query_documents(query: str, k: int = 3):
@@ -48,13 +36,8 @@ def query_documents(query: str, k: int = 3):
 
     try:
         collection = _get_collection()
-        model = _get_model()
-        query_embedding = model.encode(
-            [query],
-            normalize_embeddings=True,
-        )[0].tolist()
         results = collection.query(
-            query_embeddings=[query_embedding],
+            query_texts=[query],
             n_results=k,
         )
         documents = results.get("documents") or [[]]
