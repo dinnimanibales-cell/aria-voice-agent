@@ -37,24 +37,23 @@ async def chat_stream(message: str):
             yield f"data: {json.dumps({'token': word + ' '})}\n\n"
         yield "data: [DONE]\n\n"
     return StreamingResponse(generate(), media_type="text/event-stream")
+
 @app.post("/upload")
 async def upload_doc(file: UploadFile = File(...)):
     try:
         upload_dir = "uploads"
-        
-        # Remove if it exists as a file, create as folder
         if os.path.exists(upload_dir) and not os.path.isdir(upload_dir):
             os.remove(upload_dir)
-        
         os.makedirs(upload_dir, exist_ok=True)
-        
         path = os.path.join(upload_dir, file.filename)
-        
         with open(path, "wb") as f:
             shutil.copyfileobj(file.file, f)
-        
         count = ingest_document(path)
-        return {"message": f"✅ Done! Ingested {count} chunks from '{file.filename}'. Now ask me anything about it!"}
-
+        return {"message": f"Done! Ingested {count} chunks from '{file.filename}'. Now ask me anything about it!"}
     except Exception as e:
-        return {"message": f"❌ Upload failed: {str(e)}"}
+        return {"message": f"Upload failed: {str(e)}"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
