@@ -1,91 +1,100 @@
-from typing import List, TypedDict
-
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-from langgraph.graph import END, StateGraph
-
+from langgraph.graph import StateGraph, END
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from typing import TypedDict, List
 from backend.llm.providers import get_llm
-from backend.agent.tools import rag_tool, web_search_tool, sql_tool
-
+from backend.agent.tools import rag_tool, web_search_tool
 
 class AgentState(TypedDict):
-    messages: List[BaseMessage]
+    messages: List
+    documents: List
     next_action: str
-    documents: List[str]
 
-
-def _last_message_content(state: AgentState) -> str:
-    messages = state.get("messages", [])
-    if not messages:
-        return ""
-    return messages[-1].content
-
-
-def route_request(state: AgentState) -> str:
-    last_msg = _last_message_content(state).lower()
-    if any(kw in last_msg for kw in ["document", "file", "uploaded", "pdf"]):
-        return "rag"
-    if any(kw in last_msg for kw in ["search", "latest", "news", "today"]):
-        return "web_search"
-    if any(kw in last_msg for kw in ["database", "table", "query", "sql"]):
-        return "sql"
+def router(state: AgentState) -> str:
+    last_msg = state["messages"][-1].content.lower()
+    
+    # Always use RAG for these keywords
+    rag_keywords = [
+        "document", "file", "pdf", "uploaded", "summarize",
+        "summary", "explain", "what does", "what is in",
+        "key points", "describe", "tell me about the",
+        "according to", "based on the", "in the file",
+        "in the document", "nwkrtc", "report", "content"
+    ]
+    
+    web_keywords = [
+        "search", "latest", "news", "today", "current",
+        "weather", "price", "stock", "trending"
+    ]
+    
+    for kw in rag_keywords:
+        if kw in last_msg:
+            return "rag"
+    
+    for kw in web_keywords:
+        if kw in last_msg:
+            return "web_search"
+    
     return "llm_direct"
 
-
 def rag_node(state: AgentState) -> AgentState:
-    query = _last_message_content(state)
-    result = rag_tool(query)
-    return {**state, "documents": [result]}
+    query = state["messages"][-1].content
+    results = rag_tool(query)
+    state["documents"] = results if isinstance(results, list) else [results]
+    return state
 
-
-def web_search_node(state: AgentState) -> AgentState:
-    query = _last_message_content(state)
+def web_node(state: AgentState) -> AgentState:
+    query = state["messages"][-1].content
     result = web_search_tool(query)
-    return {**state, "documents": [result]}
-
-
-def sql_node(state: AgentState) -> AgentState:
-    query = _last_message_content(state)
-    result = sql_tool(query)
-    return {**state, "documents": [result]}
-
+    state["documents"] = [result]
+    return state
 
 def llm_node(state: AgentState) -> AgentState:
     llm = get_llm()
-    context = "\n".join(state.get("documents", []))
-    messages = state.get("messages", [])
+    messages = state["messages"]
+    documents = state.get("documents", [])
 
-    if context:
-        messages = [
-            HumanMessage(
-                content=f"Context:\n{context}\n\nQuestion: {_last_message_content(state)}"
-            )
-        ]
+    if documents:
+        context = "\n\n".join(documents)
+        system = SystemMessage(content=(
+            "You are ARIA, a helpful AI assistant. "
+            "Use the following document context to answer the user's question accurately and in detail.\n\n"
+            f"DOCUMENT CONTEXT:\n{context}\n\n"
+            "Answer based on the context above. If the answer is not in the context, say so."
+        ))
+        final_messages = [system] + list(messages)
+    else:
+        system = SystemMessage(content=(
+            "You are ARIA, a helpful and intelligent AI assistant. "
+            "Answer the user's question clearly and helpfully."
+        ))
+        final_messages = [system] + list(messages)
 
-    response = llm.invoke(messages)
-    return {**state, "messages": [*state.get("messages", []), AIMessage(content=response.content)]}
-
+    response = llm.invoke(final_messages)
+    state["messages"].append(AIMessage(content=response.content))
+    return state
 
 def build_graph():
     graph = StateGraph(AgentState)
-    graph.add_node("router", lambda state: {**state, "next_action": route_request(state)})
+
+    graph.add_node("router_node", lambda s: {**s, "next_action": router(s)})
     graph.add_node("rag", rag_node)
-    graph.add_node("web_search", web_search_node)
-    graph.add_node("sql", sql_node)
+    graph.add_node("web_search", web_node)
     graph.add_node("llm", llm_node)
 
-    graph.set_entry_point("router")
+    graph.set_entry_point("router_node")
+
     graph.add_conditional_edges(
-        "router",
-        lambda state: state["next_action"],
+        "router_node",
+        lambda s: s["next_action"],
         {
             "rag": "rag",
             "web_search": "web_search",
-            "sql": "sql",
-            "llm_direct": "llm",
-        },
+            "llm_direct": "llm"
+        }
     )
+
     graph.add_edge("rag", "llm")
     graph.add_edge("web_search", "llm")
-    graph.add_edge("sql", "llm")
     graph.add_edge("llm", END)
+
     return graph.compile()
