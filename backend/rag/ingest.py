@@ -52,7 +52,7 @@ def ingest_document(file_path: str) -> int:
         texts = [chunk.page_content for chunk in chunks]
 
         # Use ChromaDB built-in embeddings — no sentence_transformers needed
-        embed_fn = embedding_functions.DefaultEmbeddingFunction()
+        embed_fn = embedding_functions.ONNXMiniLM_L6_V2()
         embeddings = embed_fn(texts)
 
         file_key = hashlib.sha1(str(path.resolve()).encode("utf-8")).hexdigest()
