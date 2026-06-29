@@ -14,7 +14,7 @@ const sidebar = document.getElementById('sidebar');
 const langSelect = document.getElementById('langSelect');
 
 // ===== BACKEND URL =====
-const API_URL = '';
+const API_URL = 'https://aria-voice-agent-boqu.onrender.com';
 
 let chatHistory = [];
 
